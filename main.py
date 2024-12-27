@@ -8,6 +8,7 @@ logger = None
 b2evo_config = None
 wp_config = None
 b2Connection = None
+wpConnection = None
 
 def configure_logging():
     """
@@ -50,7 +51,7 @@ def loadConfig():
         wp_config = config_reader.get_database_config("wordpress")
         
         logger.info("Database Config: %s", wp_config)
-        print(wp_config)
+        
     except (FileNotFoundError, ValueError) as e:
         logger.error(e)
 
@@ -60,7 +61,8 @@ def connectToDatabases():
     myDatabaseManager = databaseManager()
     global b2Connection
     b2Connection = myDatabaseManager.connect_to_database(b2evo_config)
-    
+    global wpConnection
+    wpConnection = myDatabaseManager.connect_to_database(wp_config)
 
     
 def main():

@@ -36,7 +36,7 @@ class databaseManager:
             
             # Check if the connection was successful
             if connection.is_connected():
-                logger.info("Successfully connected to the database.")
+                logger.info("Successfully connected to the database %s", config["name"])
                 return connection
 
         except KeyError as e:
