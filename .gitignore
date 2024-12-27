@@ -1,5 +1,5 @@
 venv/
-__pycach__/
+__pycache__/
 db_config.yaml
 *.log
-modules/__pycach__
+modules/__pycache__
