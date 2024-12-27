@@ -50,6 +50,7 @@ def loadConfig():
         wp_config = config_reader.get_database_config("wordpress")
         
         logger.info("Database Config: %s", wp_config)
+        print(wp_config)
     except (FileNotFoundError, ValueError) as e:
         logger.error(e)
 
