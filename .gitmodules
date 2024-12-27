@@ -1,3 +1,4 @@
+# To update, see https://stackoverflow.com/questions/13844996/git-submodule-init-not-pulling-latest-commit
 [submodule "myCommons"]
 	path = myCommons
 	url = https://github.com/rhellem/rhellemPythonCommons.git
