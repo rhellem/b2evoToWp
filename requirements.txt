@@ -1,0 +1,3 @@
+menu
+mysql-connector-python
+pyyaml
