@@ -7,7 +7,7 @@ from myCommons.modules.configReader import ConfigReader
 logger = logging.getLogger(__name__)
 
 
-class databaseManager:
+class connectionManager:
     """Database Helper class"""
     def __init__(self):
       pass

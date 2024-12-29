@@ -2,7 +2,7 @@ import logging
 
 from myCommons.modules.envMgr import EnvSetupManager
 from myCommons.modules.configReader import ConfigReader
-from modules.databaseManager import databaseManager
+from modules.db.connectionManager import connectionManager
 
 logger = None
 b2evo_config = None
@@ -58,7 +58,7 @@ def loadConfig():
 def connectToDatabases():
     logger.info("About to open connections the source and target database")
     
-    myDatabaseManager = databaseManager()
+    myDatabaseManager = connectionManager()
     global b2Connection
     b2Connection = myDatabaseManager.connect_to_database(b2evo_config)
     global wpConnection
