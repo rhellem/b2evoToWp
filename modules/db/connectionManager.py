@@ -1,7 +1,8 @@
 import logging
-import mysql.connector
-from mysql.connector import Error
+import sys
 
+import mysql
+from mysql.connector import Error
 from myCommons.modules.configReader import ConfigReader
 
 logger = logging.getLogger(__name__)
@@ -41,11 +42,13 @@ class connectionManager:
 
         except KeyError as e:
             logger.error("Configuration error: %s", e)
+            sys.exit(e)
         except Error as e:
             logger.error("Database Connection Error: %s", e)
+            sys.exit(e)
         except Exception as e:
             logger.error("An unexptected error occured: %s", e)
-        
+            sys.exit(e)
         # Return None if the connection fails
         logger.warning("No connection, return None")
         return None

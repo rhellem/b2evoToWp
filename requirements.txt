@@ -1,3 +1,2 @@
-menu
-mysql-connector-python
 pyyaml
+mysql-connector-python
