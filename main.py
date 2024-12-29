@@ -1,8 +1,13 @@
 import logging
+import sys
+import mysql
 
+from modules.conversionHelper import ConversionHelper
 from myCommons.modules.envMgr import EnvSetupManager
 from myCommons.modules.configReader import ConfigReader
 from modules.db.connectionManager import connectionManager
+from modules.db.wpQueryHelper import wpQueryHelper
+
 
 logger = None
 b2evo_config = None
@@ -21,7 +26,7 @@ def configure_logging():
 
     # Configure logging globally
     logging.basicConfig(
-        level=logging.INFO,  # Set the default logging level
+        level=logging.DEBUG,  # Set the default logging level
         format=log_format,   # Log message format
         datefmt=date_format, # Date format
         handlers=[
@@ -64,7 +69,58 @@ def connectToDatabases():
     global wpConnection
     wpConnection = myDatabaseManager.connect_to_database(wp_config)
 
+def doBlogs():
+    """    
+    Import all blog instances from B2Evolution, making them the top categories in Wordpress
+    This since WP does not have the concept of multiple blogs, which enables you to individually apply access controll 
+    But, WP can do this pr. main categories
+    """
+    logger.info("Query for all blogs found in b2Evolution")
+    b2e_blogs_query = "SELECT blog_id,blog_name, blog_shortname FROM evo_blogs"
+    # https://stackoverflow.com/a/75691255/512139
+    b2MySqlCursor = b2Connection.cursor(dictionary=True)
+    b2MySqlCursor.execute(b2e_blogs_query)
+    allBlogsResult = b2MySqlCursor.fetchall()
     
+    if logging.getLogger().isEnabledFor(logging.DEBUG):
+        for row in allBlogsResult:
+            logger.debug("%s",row)
+    
+    if allBlogsResult is None:
+        logger.error("No blogs found, exit")
+        sys.exit("No blogs found")
+    else:
+        # Get all blogs from b2 and add as main categories in WP
+        wpMySqlCursor = wpConnection.cursor()
+        # Query to insert each main category
+        wp_terms_insert = wpQueryHelper.getInsertMainCatetgories()
+        wp_terms_taxonomy_insert = wpQueryHelper.getInsertWpTermTaxonomy()
+        for row in allBlogsResult:
+            slug = ConversionHelper.sanitize_title(row["blog_shortname"])
+            logger.debug("slug=%s", slug)
+            
+            mainCategoryValues = (row["blog_id"], row["blog_name"], slug)
+            logger.debug("Now insert into wp the main categories: %s", mainCategoryValues)
+            wpMySqlCursor.execute(wp_terms_insert, mainCategoryValues)
+            mainCategoryTaxonomyValues = (row["blog_id"],'category',row["blog_name"],0)
+            try:
+                logger.debug("Now insert into wp_term_taxonomy: %s", mainCategoryTaxonomyValues)
+                wpMySqlCursor.execute(wp_terms_taxonomy_insert, mainCategoryTaxonomyValues)
+            except mysql.connector.errors.IntegrityError as e:
+                logger.warning("IntegrityError occurred: %s. Continuing execution.", e)
+
+        logger.info("Now commit")
+        wpConnection.commit()
+        
+        # Get the term_id for each category and insert these into the wp_term_taxonomy table:
+        
+        
+        
+        
+def doCategories():
+    pass
+    
+        
 def main():
     configure_logging()
     
@@ -79,7 +135,11 @@ def main():
     # Connect to the databases
     connectToDatabases()
     
+    # Start by getting all blogs from b2 and adding them as top level categories on WP
+    doBlogs()
+    
+    # Wrap up
     b2Connection.close()
-
+    wpConnection.close()
 if __name__ == "__main__":
     main()

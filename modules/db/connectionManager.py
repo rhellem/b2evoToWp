@@ -32,7 +32,8 @@ class connectionManager:
             connection = mysql.connector.connect(
                 host=config["host"],
                 user=config["user"],
-                password=config["password"]
+                password=config["password"],
+                database=config["name"]
             )
             
             # Check if the connection was successful
