@@ -1,6 +1,6 @@
 class wpQueryHelper:
     @staticmethod
-    def getInsertMainCatetgories():
+    def getInsertWpCatetgory():
           return """
             INSERT INTO wp_terms (term_id, name, slug)
             VALUES (%s, %s, %s)
@@ -25,7 +25,7 @@ class wpQueryHelper:
     @staticmethod
     def getSelectB2AllTopCategoriesForBlog():
         return """
-            SELECT cat_id, cat_name, cat_blog_ID
+            SELECT cat_id, cat_name, cat_blog_ID,cat_urlname
             FROM evo_categories
             WHERE cat_blog_ID = %s AND cat_parent_ID IS NULL
         """
@@ -33,7 +33,7 @@ class wpQueryHelper:
     @staticmethod
     def getSelectB2AllChildCategories():
         return """
-            SELECT cat_id, cat_name, cat_blog_ID, cat_parent_ID
+            SELECT cat_id, cat_name, cat_blog_ID, cat_parent_ID,cat_urlname
             FROM evo_categories
             WHERE cat_blog_ID = %s AND cat_parent_ID = %s
         """

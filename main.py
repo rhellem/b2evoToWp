@@ -82,9 +82,6 @@ def doBlogs():
     b2MySqlCursor.execute(b2e_blogs_query)
     allBlogsResult = b2MySqlCursor.fetchall()
     
-    if logging.getLogger().isEnabledFor(logging.DEBUG):
-        for row in allBlogsResult:
-            logger.debug("%s",row)
     
     if allBlogsResult is None:
         logger.error("No blogs found, exit")
@@ -93,15 +90,15 @@ def doBlogs():
         # Get all blogs from b2 and add as main categories in WP
         wpMySqlCursor = wpConnection.cursor()
         # Query to insert each main category
-        wp_terms_insert = wpQueryHelper.getInsertMainCatetgories()
+        wp_terms_insert = wpQueryHelper.getInsertWpCatetgory()
         wp_terms_taxonomy_insert = wpQueryHelper.getInsertWpTermTaxonomy()
         for row in allBlogsResult:
             slug = ConversionHelper.sanitize_title(row["blog_shortname"])
             logger.debug("slug=%s", slug)
             
-            mainCategoryValues = (row["blog_id"], row["blog_name"], slug)
-            logger.debug("Now insert into wp the main categories: %s", mainCategoryValues)
-            wpMySqlCursor.execute(wp_terms_insert, mainCategoryValues)
+            categoryValues = (row["blog_id"], row["blog_name"], slug)
+            logger.debug("Now insert into wp the main categories: %s", categoryValues)
+            wpMySqlCursor.execute(wp_terms_insert, categoryValues)
             
             try:
                 # Get the term_id for each category and insert these into the wp_term_taxonomy table:
@@ -139,31 +136,69 @@ def doCategories():
         # Get all blogs from b2 and add as main categories in WP
         wpMySqlCursor = wpConnection.cursor()
         # Query to insert each main category
-        wp_terms_insert = wpQueryHelper.getInsertMainCatetgories()
+        wp_terms_insert = wpQueryHelper.getInsertWpCatetgory()
         wp_terms_taxonomy_insert = wpQueryHelper.getInsertWpTermTaxonomy()
         for row in allBlogsResult:
             allCategoriesQuery = wpQueryHelper.getSelectB2AllTopCategoriesForBlog()
             allCategoriesValues = (row["blog_id"],)
-            logger.debug("Now get all top categories for blog: %s", allCategoriesValues)
+            logger.debug("level=1 Now get all top categories for blog: %s", allCategoriesValues)
             b2MySqlCursor.execute(allCategoriesQuery, allCategoriesValues)
             allCategoriesResult = b2MySqlCursor.fetchall()
-            if logging.getLogger().isEnabledFor(logging.DEBUG):
-                for row in allCategoriesResult:
-                    logger.debug("%s",row)
             if allCategoriesResult is None:
                 logger.error("No top categories found for blog %s", row["blog_id"])
                 sys.exit("No top categories found for blog %s", row["blog_id"])
             else:
-                for row in allCategoriesResult:
+                for l2row in allCategoriesResult:
+                    logger.debug("level=2: Category=%s",l2row)
+                    # Insert the category as a subcategory to the main category (blog) in WP
+                    slug = ConversionHelper.sanitize_title(l2row["cat_urlname"])
+                    logger.debug("slug=%s", slug)
+                    
+                    categoryValues = (l2row["cat_id"], l2row["cat_name"], slug)
+                    logger.debug("Now insert into wp the category: %s", categoryValues)
+                    wpMySqlCursor.execute(wp_terms_insert, categoryValues)
+                    
+                    
+                    # Get the term_id for each category and insert these into the wp_term_taxonomy table:
+                    try:
+                        # Get the term_id for each category and insert these into the wp_term_taxonomy table:
+                        categoryTaxonomyValues = (l2row["cat_id"],'category',l2row["cat_name"],row["blog_id"])
+                        logger.debug("Now insert into wp_term_taxonomy: %s", categoryTaxonomyValues)
+                        wpMySqlCursor.execute(wp_terms_taxonomy_insert, categoryTaxonomyValues)
+                    except mysql.connector.errors.IntegrityError as e:
+                        logger.warning("IntegrityError occurred: %s. Continuing execution.", e)
+                    
+                    # Get all child categories for the category
                     allChildCategoriesQuery = wpQueryHelper.getSelectB2AllChildCategories()
-                    allChildCategoriesValues = (row["cat_blog_ID"], row["cat_id"])
+                    allChildCategoriesValues = (l2row["cat_blog_ID"], l2row["cat_id"])
                     logger.debug("Now get all child categories for blog: %s", allChildCategoriesValues)
                     b2MySqlCursor.execute(allChildCategoriesQuery, allChildCategoriesValues)
                     allChildCategoriesResult = b2MySqlCursor.fetchall()
-                    if logging.getLogger().isEnabledFor(logging.DEBUG):
-                        for row in allChildCategoriesResult:
-                            logger.debug("%s",row)    
-    
+                    
+                    if allChildCategoriesResult is None:
+                        logger.info("No child categories found for category %s", l2row["cat_id"])
+                    else:
+                        for l3row in allChildCategoriesResult:
+                            logger.debug("level=3: Category=%s",l3row)
+                            # Insert the category as a subcategory to the main category (blog) in WP
+                            slug = ConversionHelper.sanitize_title(l3row["cat_urlname"])
+                            logger.debug("slug=%s", slug)
+                            
+                            categoryValues = (l3row["cat_id"], l3row["cat_name"], slug)
+                            logger.debug("Now insert into wp the category: %s", categoryValues)
+                            wpMySqlCursor.execute(wp_terms_insert, categoryValues)
+                            
+                            # Get the term_id for each category and insert these into the wp_term_taxonomy table:
+                            try:
+                                # Get the term_id for each category and insert these into the wp_term_taxonomy table:
+                                categoryTaxonomyValues = (l3row["cat_id"],'category',l3row["cat_name"],l2row["cat_id"])
+                                logger.debug("Now insert into wp_term_taxonomy: %s", categoryTaxonomyValues)
+                                wpMySqlCursor.execute(wp_terms_taxonomy_insert, categoryTaxonomyValues)
+                            except mysql.connector.errors.IntegrityError as e:
+                                logger.warning("IntegrityError occurred: %s. Continuing execution")
+        # Done, lets commit                        
+        logger.info("Now commit main categories to WP")
+        wpConnection.commit()    
     
     
         
