@@ -166,7 +166,7 @@ def doCategories():
                         logger.debug("Now insert into wp_term_taxonomy: %s", categoryTaxonomyValues)
                         wpMySqlCursor.execute(wp_terms_taxonomy_insert, categoryTaxonomyValues)
                     except mysql.connector.errors.IntegrityError as e:
-                        logger.warning("IntegrityError occurred: %s. Continuing execution.", e)
+                        logger.warning("IntegrityError occurred: %s. Continuing script.", e)
                     
                     # Get all child categories for the category
                     allChildCategoriesQuery = wpQueryHelper.getSelectB2AllChildCategories()
@@ -200,7 +200,58 @@ def doCategories():
         logger.info("Now commit main categories to WP")
         wpConnection.commit()    
     
-    
+def doPosts():
+    # Get all posts from b2 and add them as posts in WP
+    logger.info("Query for all posts found in b2Evolution")
+    b2e_posts_query = wpQueryHelper.getSelectB2AllPosts()
+    # https://stackoverflow.com/a/75691255/512139
+    b2MySqlCursor = b2Connection.cursor(dictionary=True)
+    b2MySqlCursor.execute(b2e_posts_query)
+    allB2PostsResult = b2MySqlCursor.fetchall()
+    if allB2PostsResult is None:
+        logger.error("No posts found, exit")
+        sys.exit("No blogs found")
+    else:
+        # Get all blogs from b2 and add as main categories in WP
+        wpMySqlCursor = wpConnection.cursor()
+        # Query to insert each post
+        wp_posts_insert = wpQueryHelper.getInsertWpPost()
+        
+        # All posts should be viewable for all
+        status_for_all_posts = "publish"
+        logger.info("Using status: %s", status_for_all_posts)
+        
+        for b2Post in allB2PostsResult:
+            b2PostDate = ConversionHelper.convert_date(b2Post["post_datestart"])
+            # Insert the post into WP
+            newWpPostValues = (b2Post["post_ID"], 
+                               b2Post["post_title"], 
+                               b2Post["post_content"], 
+                               status_for_all_posts,
+                               b2PostDate,
+                               b2PostDate,
+                               b2PostDate,
+                               b2PostDate)
+            try:
+                wpMySqlCursor.execute(wp_posts_insert, newWpPostValues)
+            except mysql.connector.errors.IntegrityError as e:
+                logger.warning("IntegrityError occurred inserting post: %s. Continuing script.", e)
+            
+            # Link the posts to the categories in WP
+            logger.info("Link the posts to the categories in WP")
+            wpTermRelationshipsInsert = wpQueryHelper.getInsertWpTermRelationship()
+            
+            # post_id equals the object_id in wp_term_relationships   
+            # post_main_cat_ID equals the term_taxonomy_id in wp_term_relationships
+            wpTermRelationshipsValues = (b2Post["post_ID"], b2Post["post_main_cat_ID"])
+            try:
+                wpMySqlCursor.execute(wpTermRelationshipsInsert, wpTermRelationshipsValues)
+            except mysql.connector.errors.IntegrityError as e:
+                logger.warning("IntegrityError occurred inserting term relationship: %s. Continuing script.", e)
+            
+    # Done, lets commit                        
+    logger.info("Now commit posts and relationship to WP")
+    wpConnection.commit()
         
 def main():
     configure_logging()
@@ -221,6 +272,9 @@ def main():
     
     # Then get all categories from b2 and add them as subcategories to the main categories in WP
     doCategories()
+    
+    # Then get all posts from b2 and add them as posts in WP
+    doPosts()
     
     # Wrap up
     b2Connection.close()
