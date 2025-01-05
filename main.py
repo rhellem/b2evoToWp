@@ -213,41 +213,62 @@ def doPosts():
         sys.exit("No blogs found")
     else:
         # Get all blogs from b2 and add as main categories in WP
-        wpMySqlCursor = wpConnection.cursor()
+        wpMySqlCursor = wpConnection.cursor(dictionary=True)  # Ensure cursor returns dictionaries
         # Query to insert each post
         wp_posts_insert = wpQueryHelper.getInsertWpPost()
+        
+        # Assumption is one author for all posts and that user is already created in WP
+        userIdforAllPosts = "hellem"
+        logger.info("Using user_login=%s for all posts", userIdforAllPosts)
+        wpAuthorIdSql = wpQueryHelper.getSelectUserIdFromWpUsers()
+        logger.debug("wpAuthorIdSql=%s", wpAuthorIdSql)
+        wpMySqlCursor.execute(wpAuthorIdSql, (userIdforAllPosts,))
+        wpAuthorIdResult = wpMySqlCursor.fetchone()
+        
+        if wpAuthorIdResult is None:
+            logger.error("User %s is not a valid user in WordPress", userIdforAllPosts)
+            sys.exit("User %s is not a valid user in WordPress" % userIdforAllPosts)
+        
+        wpAuthorId = wpAuthorIdResult["ID"]
+        logger.debug("wpAuthorId=%s", wpAuthorId)
         
         # All posts should be viewable for all
         status_for_all_posts = "publish"
         logger.info("Using status: %s", status_for_all_posts)
         
+        wpTermTaxonomyQuery = wpQueryHelper.getSelectTermTaxonomyId()
+        wpTermRelationshipsInsert = wpQueryHelper.getInsertWpTermRelationships()
+        
         for b2Post in allB2PostsResult:
             b2PostDate = ConversionHelper.convert_date(b2Post["post_datestart"])
             # Insert the post into WP
-            newWpPostValues = (b2Post["post_ID"], 
-                               b2Post["post_title"], 
-                               b2Post["post_content"], 
-                               status_for_all_posts,
-                               b2PostDate,
-                               b2PostDate,
-                               b2PostDate,
-                               b2PostDate)
-            try:
-                wpMySqlCursor.execute(wp_posts_insert, newWpPostValues)
-            except mysql.connector.errors.IntegrityError as e:
-                logger.warning("IntegrityError occurred inserting post: %s. Continuing script.", e)
+            newWpPostValues = (
+                b2Post["post_ID"],
+                wpAuthorId,  # Ensure this is an integer
+                b2Post["post_title"],
+                b2Post["post_content"],
+                status_for_all_posts,
+                b2PostDate,
+                b2PostDate,
+                b2PostDate,
+                b2PostDate
+            )
+            wpMySqlCursor.execute(wp_posts_insert, newWpPostValues)
             
-            # Link the posts to the categories in WP
-            logger.info("Link the posts to the categories in WP")
-            wpTermRelationshipsInsert = wpQueryHelper.getInsertWpTermRelationship()
+            # Get term_taxonomy_id for the post_main_cat_ID
+            wpMySqlCursor.execute(wpTermTaxonomyQuery, (b2Post["post_main_cat_ID"],))
+            termTaxonomyResult = wpMySqlCursor.fetchone()
             
-            # post_id equals the object_id in wp_term_relationships   
-            # post_main_cat_ID equals the term_taxonomy_id in wp_term_relationships
-            wpTermRelationshipsValues = (b2Post["post_ID"], b2Post["post_main_cat_ID"])
-            try:
-                wpMySqlCursor.execute(wpTermRelationshipsInsert, wpTermRelationshipsValues)
-            except mysql.connector.errors.IntegrityError as e:
-                logger.warning("IntegrityError occurred inserting term relationship: %s. Continuing script.", e)
+            if termTaxonomyResult:
+                term_taxonomy_id = termTaxonomyResult["term_taxonomy_id"]
+                wpTermRelationshipsValues = (b2Post["post_ID"], term_taxonomy_id)
+                try:
+                    logger.info("Inserting term_relationships for post %s", b2Post["post_ID"])
+                    wpMySqlCursor.execute(wpTermRelationshipsInsert, wpTermRelationshipsValues)
+                except mysql.connector.errors.IntegrityError as e:
+                    logger.warning("IntegrityError occurred: %s. Continuing execution.", e)
+            else:
+                logger.warning("No term_taxonomy_id found for term_id %s", b2Post["post_main_cat_ID"])
             
     # Done, lets commit                        
     logger.info("Now commit posts and relationship to WP")

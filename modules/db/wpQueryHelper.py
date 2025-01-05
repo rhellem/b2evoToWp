@@ -52,11 +52,35 @@ class wpQueryHelper:
             FROM evo_items__item
         """
         
-    staticmethod
+    @staticmethod
     def getInsertWpPost():
         return """
             INSERT INTO wp_posts (
-                ID, post_title, post_content, post_excerpt, post_status, post_date, 
-                post_date_gmt, post_modified, post_modified_gmt, to_ping, pinged, post_content_filtered
-            ) VALUES (%s, %s, %s, '', %s, %s, %s, %s, %s, '', '', '')
+                ID, post_author, post_title, post_content, post_excerpt, post_status, 
+                post_date, post_date_gmt, post_modified, post_modified_gmt, to_ping, 
+                pinged, post_content_filtered
+            ) VALUES (%s, %s, %s, %s, '', %s, %s, %s, %s, %s, '', '', '')
+        """
+    
+    @staticmethod
+    def getSelectUserIdFromWpUsers():
+        return """
+            SELECT ID
+            FROM wp_users
+            WHERE user_login = %s
+        """
+    
+    @staticmethod
+    def getSelectTermTaxonomyId():
+        return """
+            SELECT term_taxonomy_id
+            FROM wp_term_taxonomy
+            WHERE term_id = %s
+        """
+
+    @staticmethod
+    def getInsertWpTermRelationships():
+        return """
+            INSERT INTO wp_term_relationships (object_id, term_taxonomy_id)
+            VALUES (%s, %s)
         """
